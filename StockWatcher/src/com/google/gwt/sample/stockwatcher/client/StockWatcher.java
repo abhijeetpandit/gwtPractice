@@ -3,8 +3,11 @@ package com.google.gwt.sample.stockwatcher.client;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import com.google.gwt.core.client.EntryPoint;
+import com.google.gwt.core.shared.GWT;
 import com.google.gwt.event.dom.client.ClickEvent;
 import com.google.gwt.event.dom.client.ClickHandler;
 import com.google.gwt.event.dom.client.KeyCodes;
@@ -12,9 +15,9 @@ import com.google.gwt.event.dom.client.KeyDownEvent;
 import com.google.gwt.event.dom.client.KeyDownHandler;
 import com.google.gwt.i18n.client.DateTimeFormat;
 import com.google.gwt.i18n.client.NumberFormat;
-import com.google.gwt.user.client.Random;
 import com.google.gwt.user.client.Timer;
 import com.google.gwt.user.client.Window;
+import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.google.gwt.user.client.ui.Button;
 import com.google.gwt.user.client.ui.FlexTable;
 import com.google.gwt.user.client.ui.HorizontalPanel;
@@ -27,6 +30,9 @@ import com.google.gwt.user.client.ui.VerticalPanel;
  * Entry point classes define <code>onModuleLoad()</code>.
  */
 public class StockWatcher implements EntryPoint {
+	private static Logger LOGGER = Logger.getLogger(StockWatcher.class.getName());
+	
+	
 	private static final int REFRESH_INTERVAL = 5000;
 	private VerticalPanel mainPanel = new VerticalPanel();
 	private FlexTable stocksFlexTable = new FlexTable();
@@ -35,7 +41,7 @@ public class StockWatcher implements EntryPoint {
 	private Button addStockButton = new Button("Add stock"); 
 	private Label lastUpdatedLabel = new Label();
 	private List<String> stocks = new ArrayList<>();
-	
+	private StockPriceServiceAsync stockService = GWT.create(StockPriceService.class);
 	@Override
 	public void onModuleLoad() {
 		stocksFlexTable.setText(0, 0, "Symbol");
@@ -120,17 +126,24 @@ public class StockWatcher implements EntryPoint {
 	}
 	
 	private void refreshWatchList() {
-		final double MAX_PRICE = 100.0; // $100.00
-	    final double MAX_PRICE_CHANGE = 0.02; // +/- 2%
+		LOGGER.log(Level.SEVERE, "REfreshing");		
 		
-	    StockPrice[] stockPrices = new StockPrice[stocks.size()];
-	    
-	    for(int i=0; i < stocks.size(); i++) {
-	    	double price = Random.nextDouble() * MAX_PRICE;
-	    	double change = price * MAX_PRICE_CHANGE * (Random.nextDouble() * 2.0 - 1.0);
-	    	stockPrices[i] = new StockPrice(stocks.get(i), price, change);
-	    }
-	    updateTable(stockPrices);
+		if (stockService == null) {
+			stockService = GWT.create(StockPriceService.class);
+		}
+		AsyncCallback<StockPrice[]> callback = new AsyncCallback<StockPrice[]>() {
+
+			@Override
+			public void onFailure(Throwable caught) {
+				LOGGER.log(Level.SEVERE, caught.getMessage(), caught);
+			}
+
+			@Override
+			public void onSuccess(StockPrice[] result) {
+				updateTable(result);
+			}
+		};
+		stockService.getStockPrices(stocks.toArray(new String[stocks.size()]), callback);
 	}
 
 	private void updateTable(StockPrice[] stockPrices) {
